@@ -4,21 +4,21 @@ import sqlite3
 import shutil
 import os
 from datetime import datetime, timedelta
-from factura import generar_factura
 
 class ConfiguracionScreen:
     def __init__(self, root, app):
-        print("Initializing ConfiguracionScreen")  # Debug
+        print("Initializing ConfiguracionScreen")
         self.root = root
         self.app = app
-        self.frame = tk.Frame(self.root)
-        self.frame.pack(pady=10, padx=10, fill="both", expand=True)
         
         # Verificar que el usuario sea Admin
         if self.app.current_role != "Admin":
             messagebox.showerror("Error", "Acceso denegado. Solo los administradores pueden acceder a Configuración.")
             self.app.show_main_menu(self.app.current_user, self.app.current_role)
             return
+        
+        self.frame = tk.Frame(self.root)
+        self.frame.pack(pady=10, padx=10, fill="both", expand=True)
         
         # Notebook para pestañas
         notebook = ttk.Notebook(self.frame)
@@ -73,7 +73,6 @@ class ConfiguracionScreen:
         tk.Button(facturas_frame, text="Subir Nuevo Logo", command=self.subir_logo).pack(pady=5)
         self.incluir_cliente_var = tk.BooleanVar(value=True)
         tk.Checkbutton(facturas_frame, text="Incluir Nombre del Cliente en Factura", variable=self.incluir_cliente_var).pack(pady=5)
-        tk.Button(facturas_frame, text="Test Impresora", command=self.test_impresora).pack(pady=5)
         
         # Pestaña: Exportaciones
         export_frame = tk.Frame(notebook)
@@ -108,7 +107,8 @@ class ConfiguracionScreen:
         self.cargar_usuarios()
 
     def cargar_usuarios(self):
-        print("Loading users")  # Debug
+        """Carga la lista de usuarios desde la base de datos."""
+        print("Loading users")
         for item in self.usuarios_tree.get_children():
             self.usuarios_tree.delete(item)
         try:
@@ -120,10 +120,11 @@ class ConfiguracionScreen:
             conn.close()
         except sqlite3.Error as e:
             messagebox.showerror("Error", f"Error al cargar usuarios: {e}")
-            print(f"Error loading users: {e}")  # Debug
+            print(f"Error loading users: {e}")
 
     def agregar_usuario(self):
-        print("Opening add user window")  # Debug
+        """Abre una ventana para agregar un nuevo usuario."""
+        print("Opening add user window")
         ventana = tk.Toplevel(self.root)
         ventana.title("Agregar Usuario")
         ventana.geometry("300x200")
@@ -162,13 +163,14 @@ class ConfiguracionScreen:
                 messagebox.showinfo("Éxito", "Usuario agregado correctamente")
             except sqlite3.Error as e:
                 messagebox.showerror("Error", f"Error al agregar usuario: {e}")
-                print(f"Error adding user: {e}")  # Debug
+                print(f"Error adding user: {e}")
         
         tk.Button(ventana, text="Guardar", command=guardar).pack(pady=10)
         tk.Button(ventana, text="Cancelar", command=lambda: [ventana.grab_release(), ventana.destroy()]).pack(pady=5)
 
     def editar_usuario(self):
-        print("Opening edit user window")  # Debug
+        """Abre una ventana para editar un usuario seleccionado."""
+        print("Opening edit user window")
         selected = self.usuarios_tree.selection()
         if not selected:
             messagebox.showerror("Error", "Seleccione un usuario")
@@ -209,13 +211,14 @@ class ConfiguracionScreen:
                 messagebox.showinfo("Éxito", "Usuario actualizado correctamente")
             except sqlite3.Error as e:
                 messagebox.showerror("Error", f"Error al actualizar usuario: {e}")
-                print(f"Error updating user: {e}")  # Debug
+                print(f"Error updating user: {e}")
         
         tk.Button(ventana, text="Guardar", command=guardar).pack(pady=10)
         tk.Button(ventana, text="Cancelar", command=lambda: [ventana.grab_release(), ventana.destroy()]).pack(pady=5)
 
     def eliminar_usuario(self):
-        print("Deleting user")  # Debug
+        """Elimina un usuario seleccionado."""
+        print("Deleting user")
         selected = self.usuarios_tree.selection()
         if not selected:
             messagebox.showerror("Error", "Seleccione un usuario")
@@ -235,10 +238,11 @@ class ConfiguracionScreen:
                 messagebox.showinfo("Éxito", "Usuario eliminado correctamente")
             except sqlite3.Error as e:
                 messagebox.showerror("Error", f"Error al eliminar usuario: {e}")
-                print(f"Error deleting user: {e}")  # Debug
+                print(f"Error deleting user: {e}")
 
     def respaldar_db(self):
-        print("Backing up database")  # Debug
+        """Crea un respaldo de la base de datos."""
+        print("Backing up database")
         try:
             backup_dir = "exportaciones/respaldos"
             os.makedirs(backup_dir, exist_ok=True)
@@ -246,26 +250,28 @@ class ConfiguracionScreen:
             backup_path = os.path.join(backup_dir, f"gvape_backup_{timestamp}.db")
             shutil.copy(self.app.db_path, backup_path)
             messagebox.showinfo("Éxito", f"Respaldo creado en {backup_path}")
-            print(f"Database backed up to {backup_path}")  # Debug
+            print(f"Database backed up to {backup_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Error al crear respaldo: {e}")
-            print(f"Error backing up database: {e}")  # Debug
+            print(f"Error backing up database: {e}")
 
     def restaurar_db(self):
-        print("Restoring database")  # Debug
+        """Restaura la base de datos desde un respaldo."""
+        print("Restoring database")
         backup_path = filedialog.askopenfilename(filetypes=[("SQLite Database", "*.db")])
         if backup_path:
             if messagebox.askyesno("Confirmar", "Restaurar la base de datos sobrescribirá los datos actuales. ¿Continuar?"):
                 try:
                     shutil.copy(backup_path, self.app.db_path)
                     messagebox.showinfo("Éxito", "Base de datos restaurada correctamente")
-                    print(f"Database restored from {backup_path}")  # Debug
+                    print(f"Database restored from {backup_path}")
                 except Exception as e:
                     messagebox.showerror("Error", f"Error al restaurar base de datos: {e}")
-                    print(f"Error restoring database: {e}")  # Debug
+                    print(f"Error restoring database: {e}")
 
     def limpiar_ventas(self):
-        print("Cleaning old sales")  # Debug
+        """Elimina ventas de más de un año."""
+        print("Cleaning old sales")
         if messagebox.askyesno("Confirmar", "Se eliminarán las ventas de más de un año. ¿Continuar?"):
             try:
                 conn = sqlite3.connect(self.app.db_path)
@@ -276,73 +282,52 @@ class ConfiguracionScreen:
                 conn.commit()
                 conn.close()
                 messagebox.showinfo("Éxito", "Ventas antiguas eliminadas correctamente")
-                print("Old sales cleaned")  # Debug
+                print("Old sales cleaned")
             except sqlite3.Error as e:
                 messagebox.showerror("Error", f"Error al limpiar ventas: {e}")
-                print(f"Error cleaning sales: {e}")  # Debug
-
-    def test_impresora(self):
-        print("Testing printer")  # Debug
-        try:
-            # Generar una factura de prueba
-            test_carrito = [{
-                "producto_id": 0,
-                "nombre": "Producto de Prueba",
-                "cantidad": 1,
-                "precio": 100.00,
-                "total": 100.00
-            }]
-            generar_factura(
-                venta_id=0,
-                cliente_nombre="Cliente de Prueba",
-                fecha=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                carrito=test_carrito,
-                subtotal=100.00,
-                db_path=self.app.db_path,
-                usuario_nombre=self.app.current_user,
-                incluir_cliente=True
-            )
-            messagebox.showinfo("Éxito", "Impresión de prueba enviada a la impresora")
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al probar impresora: {e}")
-            print(f"Error testing printer: {e}")  # Debug
+                print(f"Error cleaning sales: {e}")
 
     def aplicar_tema(self):
-        print("Applying theme")  # Debug
+        """Aplica el tema seleccionado (claro/oscuro)."""
+        print("Applying theme")
         tema = self.tema_combobox.get()
         messagebox.showinfo("Info", f"Tema {tema} aplicado (requiere reinicio para cambios completos)")
 
     def aplicar_fuente(self):
-        print("Applying font size")  # Debug
+        """Aplica el tamaño de fuente seleccionado."""
+        print("Applying font size")
         try:
             font_size = int(self.fuente_spinbox.get())
             self.root.option_add("*Font", f"Arial {font_size}")
             messagebox.showinfo("Éxito", f"Tamaño de fuente {font_size} aplicado (requiere reinicio para cambios completos)")
         except ValueError:
             messagebox.showerror("Error", "Tamaño de fuente inválido")
-            print("Invalid font size")  # Debug
+            print("Invalid font size")
 
     def subir_logo(self):
-        print("Uploading logo")  # Debug
+        """Sube un nuevo logo para las facturas."""
+        print("Uploading logo")
         logo_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png *.jpg *.jpeg")])
         if logo_path:
             try:
                 os.makedirs("assets", exist_ok=True)
                 shutil.copy(logo_path, "assets/logo.png")
                 messagebox.showinfo("Éxito", "Logo actualizado correctamente")
-                print("Logo uploaded to assets/logo.png")  # Debug
+                print("Logo uploaded to assets/logo.png")
             except Exception as e:
                 messagebox.showerror("Error", f"Error al subir logo: {e}")
-                print(f"Error uploading logo: {e}")  # Debug
+                print(f"Error uploading logo: {e}")
 
     def seleccionar_ruta_export(self):
-        print("Selecting export path")  # Debug
+        """Selecciona la ruta para exportaciones."""
+        print("Selecting export path")
         ruta = filedialog.askdirectory()
         if ruta:
             self.ruta_export_var.set(ruta)
             messagebox.showinfo("Éxito", f"Ruta de exportaciones actualizada a {ruta}")
-            print(f"Export path set to {ruta}")  # Debug
+            print(f"Export path set to {ruta}")
 
     def guardar_parametros(self):
-        print("Saving parameters")  # Debug
+        """Guarda los parámetros del sistema."""
+        print("Saving parameters")
         messagebox.showinfo("Éxito", "Parámetros guardados correctamente")
