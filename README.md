@@ -25,18 +25,7 @@ pip install pyinstaller
 Ejecuta este comando para compilar la app:
 
 ```
-pyinstaller --onefile --name GvapeStore --windowed ^
---hidden-import=tkinter ^
---hidden-import=reportlab ^
---hidden-import=pandas ^
---hidden-import=openpyxl ^
---hidden-import=tkcalendar ^
---hidden-import=win32api ^
---hidden-import=win32print ^
---add-data "assets;assets" ^
---add-data "base_datos;base_datos" ^
---add-data "exportaciones;exportaciones" ^
-app.py
+pyinstaller --onefile --name GvapeStore --windowed --hidden-import=tkinter --hidden-import=reportlab --hidden-import=pandas --hidden-import=openpyxl --hidden-import=tkcalendar --hidden-import=win32api --hidden-import=win32print --add-data "assets;assets" --add-data "base_datos;base_datos" --add-data "exportaciones;exportaciones" app.py
 ```
 
 > Si usas CMD en lugar de PowerShell, reemplaza `^` por `\` o escribe todo en una sola línea.
