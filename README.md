@@ -18,6 +18,9 @@ pyinstaller --onefile --name GvapeStore --windowed --hidden-import=tkinter --hid
 
 
 note:
+folders in the root folder for gvapestore.
 base_datos/
+
 exportaciones/
+
 assets/  *(here goes your logo "Logo.png' file for receip)
