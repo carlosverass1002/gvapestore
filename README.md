@@ -1,48 +1,63 @@
-🟢 GvapeStore — First Release
-✅ Requisitos
-Instala los paquetes necesarios ejecutando:
+Perfecto, aquí tienes el texto listo para copiar y pegar directamente en Reddit:
 
-bash
-Copy
-Edit
+---
+
+## 🟢 GvapeStore — First Release
+
+### ✅ Requisitos
+
+Ejecuta este comando para instalar las dependencias necesarias:
+
+```
 pip install tkinter reportlab pandas openpyxl tkcalendar
-Para compilar la app en Windows (PowerShell):
+```
 
-bash
-Copy
-Edit
+En PowerShell, instala PyInstaller:
+
+```
 pip install pyinstaller
-🛠️ Compilación
-Compila la aplicación en un solo archivo ejecutable con:
+```
 
-bash
-Copy
-Edit
+---
+
+### 🛠️ Compilación del ejecutable
+
+Ejecuta este comando para compilar la app:
+
+```
 pyinstaller --onefile --name GvapeStore --windowed ^
-  --hidden-import=tkinter ^
-  --hidden-import=reportlab ^
-  --hidden-import=pandas ^
-  --hidden-import=openpyxl ^
-  --hidden-import=tkcalendar ^
-  --hidden-import=win32api ^
-  --hidden-import=win32print ^
-  --add-data "assets;assets" ^
-  --add-data "base_datos;base_datos" ^
-  --add-data "exportaciones;exportaciones" ^
-  app.py
-🔁 Si estás en CMD en lugar de PowerShell, reemplaza ^ por \ o concatena el comando en una línea.
+--hidden-import=tkinter ^
+--hidden-import=reportlab ^
+--hidden-import=pandas ^
+--hidden-import=openpyxl ^
+--hidden-import=tkcalendar ^
+--hidden-import=win32api ^
+--hidden-import=win32print ^
+--add-data "assets;assets" ^
+--add-data "base_datos;base_datos" ^
+--add-data "exportaciones;exportaciones" ^
+app.py
+```
 
-📁 Estructura de carpetas necesaria (colocar en la raíz del proyecto)
-base_datos/
+> Si usas CMD en lugar de PowerShell, reemplaza `^` por `\` o escribe todo en una sola línea.
 
-exportaciones/
+---
 
-assets/
+### 📁 Carpetas requeridas en la raíz del proyecto
 
-Aquí debes colocar tu logo como Logo.png (se usará para los recibos)
+Asegúrate de tener las siguientes carpetas:
 
-💡 Nota
-Este es el primer release. Comentarios y sugerencias son bienvenidos.
-¡Gracias por probar GvapeStore!
+* `base_datos/`
+* `exportaciones/`
+* `assets/` → Aquí debes colocar tu logo con el nombre exacto: `Logo.png` (se usará en los recibos)
 
-¿Quieres que lo prepare también en formato Markdown para GitHub o prefieres algo más informal para Reddit?
+---
+
+### 💬 Nota
+
+Este es el **primer release** de GvapeStore.
+Comentarios, pruebas y sugerencias son bienvenidos. ¡Gracias por probarlo!
+
+---
+
+Listo para pegar. Si necesitas otra versión para GitHub o presentación más técnica, solo dime.
