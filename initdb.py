@@ -1,0 +1,10 @@
+import sqlite3
+conn = sqlite3.connect("base_datos/gvape.db")
+c = conn.cursor()
+c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+print("Tables:", c.fetchall())
+c.execute("SELECT usuario, rol FROM usuarios")
+print("Users:", c.fetchall())
+c.execute("SELECT codigo, nombre, stock, ml FROM productos")
+print("Products:", c.fetchall())
+conn.close()
