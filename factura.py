@@ -5,15 +5,24 @@ from reportlab.platypus import Image
 import os
 from datetime import datetime
 import traceback
-import win32print
+import sys
 import win32api
-import time
-import subprocess
+import win32print
+from tkinter import messagebox
+
+def resource_path(relative_path):
+    """Obtiene la ruta absoluta para recursos empaquetados con PyInstaller."""
+    try:
+        # PyInstaller crea un directorio temporal en sys._MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 def generar_factura(venta_id, cliente_nombre, fecha, carrito, subtotal, db_path, usuario_nombre="Desconocido", incluir_cliente=True):
     print(f"Generando recibo para venta_id: {venta_id}")
     try:
-        output_dir = "exportaciones/facturas"
+        output_dir = resource_path("exportaciones/facturas")
         os.makedirs(output_dir, exist_ok=True)
         pdf_path = os.path.join(output_dir, f"recibo_{venta_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
         
@@ -23,18 +32,17 @@ def generar_factura(venta_id, cliente_nombre, fecha, carrito, subtotal, db_path,
         y = receipt_height - 10 * mm
 
         # Logo
-        logo_path = "assets/logo.png"
+        logo_path = resource_path("assets/logo.png")
         if os.path.exists(logo_path):
             try:
-                logo = Image(logo_path, width=50 * mm, height=15 * mm, hAlign='CENTER')
-                logo.drawOn(c, (receipt_width - 50 * mm) / 2, y - 15 * mm)
-                y -= 20 * mm
-                print(f"Logo incluido en el PDF desde: {logo_path}")
+                logo = Image(logo_path, width=60 * mm, height=20 * mm, hAlign='CENTER')
+                logo.drawOn(c, (receipt_width - 60 * mm) / 2, y - 20 * mm)
+                y -= 25 * mm
             except Exception as e:
                 print(f"Error cargando logo: {e}")
                 y -= 10 * mm
         else:
-            print(f"Logo no encontrado en la ruta: {logo_path}")
+            print("Logo no encontrado")
             y -= 10 * mm
 
         # Datos de la tienda
@@ -110,73 +118,30 @@ def generar_factura(venta_id, cliente_nombre, fecha, carrito, subtotal, db_path,
         c.save()
         print(f"Recibo guardado en {pdf_path}")
 
-        # Imprimir el PDF dos veces con 2 segundos de diferencia
+        # Verificar si hay una impresora predeterminada
         try:
-            imprimir_pdf(pdf_path)  # Primera impresión
-            time.sleep(2)  # Esperar 2 segundos
-            imprimir_pdf(pdf_path)  # Segunda impresión
+            default_printer = win32print.GetDefaultPrinter()
+            if not default_printer:
+                raise Exception("No se encontró una impresora predeterminada")
         except Exception as e:
-            print(f"Error al imprimir con ShellExecute: {e}")
-            # Respaldo: Intentar con subprocess y Edge
-            try:
-                imprimir_pdf_edge(pdf_path)  # Primera impresión
-                time.sleep(2)
-                imprimir_pdf_edge(pdf_path)  # Segunda impresión
-            except Exception as e:
-                print(f"Error al imprimir con Edge: {e}")
+            messagebox.showerror("Error de Impresión", f"No se puede imprimir: {e}. Verifique que una impresora esté configurada y encendida.")
+            print(f"Error verificando impresora: {e}")
+            return pdf_path
+
+        # Enviar a la cola de impresión dos veces
+        try:
+            for _ in range(2):
+                win32api.ShellExecute(0, "print", pdf_path, None, ".", 0)
+                print(f"Enviado a la cola de impresión ({_ + 1}/2)")
+        except Exception as e:
+            messagebox.showerror("Error de Impresión", f"Error al enviar a la cola de impresión: {e}. Verifique que la impresora esté funcionando.")
+            print(f"Error al enviar a la cola de impresión: {e}")
+            traceback.print_exc()
 
         return pdf_path
 
     except Exception as e:
         print(f"Error generando recibo: {e}")
         traceback.print_exc()
-        raise
-
-def imprimir_pdf(pdf_path):
-    print(f"Imprimiendo PDF con ShellExecute: {pdf_path}")
-    try:
-        if not os.path.exists(pdf_path):
-            raise FileNotFoundError(f"El archivo PDF no existe: {pdf_path}")
-        printer_name = win32print.GetDefaultPrinter()
-        print(f"Imprimiendo en: {printer_name}")
-        
-        # Usar win32api.ShellExecute para imprimir el PDF
-        win32api.ShellExecute(
-            0,
-            "print",
-            pdf_path,
-            f'/d:"{printer_name}"',
-            ".",
-            0
-        )
-        print("PDF enviado a la impresora con ShellExecute correctamente")
-    except Exception as e:
-        print(f"Error en imprimir_pdf: {e}")
-        traceback.print_exc()
-        raise
-
-def imprimir_pdf_edge(pdf_path):
-    print(f"Imprimiendo PDF con Microsoft Edge: {pdf_path}")
-    try:
-        if not os.path.exists(pdf_path):
-            raise FileNotFoundError(f"El archivo PDF no existe: {pdf_path}")
-        printer_name = win32print.GetDefaultPrinter()
-        print(f"Imprimiendo en: {printer_name}")
-        
-        # Usar subprocess para llamar a Edge directamente
-        edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-        if not os.path.exists(edge_path):
-            raise FileNotFoundError("Microsoft Edge no encontrado en la ruta predeterminada")
-        
-        subprocess.run([
-            edge_path,
-            "--headless",
-            f"--print-to-pdf={pdf_path}.temp.pdf",
-            f"--printer-name={printer_name}",
-            pdf_path
-        ], check=True)
-        print("PDF enviado a la impresora con Edge correctamente")
-    except Exception as e:
-        print(f"Error en imprimir_pdf_edge: {e}")
-        traceback.print_exc()
+        messagebox.showerror("Error", f"Error generando recibo: {e}")
         raise

@@ -5,6 +5,8 @@ import sqlite3
 from datetime import datetime
 import pandas as pd
 import os
+import sys
+import win32api
 
 class ReportesScreen:
     def __init__(self, root, app, mode):
@@ -14,11 +16,22 @@ class ReportesScreen:
         self.mode = mode
         self.frame = tk.Frame(self.root)
         self.frame.pack(pady=10, padx=10, fill="both", expand=True)
+        self.last_exported_file = None  # Variable para almacenar la ruta del último archivo exportado
+        self.print_button = None  # Variable para controlar el botón de impresión
         
         if self.mode == "historial":
             self.mostrar_historial_ventas()
         elif self.mode == "reportes":
             self.mostrar_reportes()
+
+    def resource_path(self, relative_path):
+        """Obtiene la ruta absoluta para recursos empaquetados con PyInstaller."""
+        try:
+            # PyInstaller crea un directorio temporal en sys._MEIPASS
+            base_path = sys._MEIPASS
+        except AttributeError:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
 
     def mostrar_historial_ventas(self):
         print("Mostrando historial de ventas")
@@ -126,14 +139,15 @@ class ReportesScreen:
             self.fecha_fin = DateEntry(self.frame, date_pattern="yyyy-mm-dd")
             self.fecha_fin.grid(row=1, column=3, sticky="w")
             
-            tk.Button(self.frame, text="Generar Reporte", command=self.generar_reporte).grid(row=2, column=0, columnspan=4, pady=5)
+            tk.Button(self.frame, text="Generar Reporte", command=self.generar_reporte).grid(row=2, column=0, columnspan=2, pady=5)
+            tk.Button(self.frame, text="Exportar a Excel", command=self.exportar_excel).grid(row=2, column=2, columnspan=1, pady=5)
+            self.print_button = tk.Button(self.frame, text="Imprimir Reporte", command=self.imprimir_reporte, state="disabled")
+            self.print_button.grid(row=2, column=3, columnspan=1, pady=5)
+            tk.Button(self.frame, text="Volver", command=lambda: self.app.show_main_menu(self.app.current_user, self.app.current_role)).grid(row=4, column=0, columnspan=4, pady=5)
             
             # Área de resultados
             self.resultados_texto = tk.Text(self.frame, height=10, width=60)
             self.resultados_texto.grid(row=3, column=0, columnspan=4, pady=10)
-            
-            tk.Button(self.frame, text="Exportar a Excel", command=self.exportar_excel).grid(row=4, column=0, columnspan=4, pady=5)
-            tk.Button(self.frame, text="Volver", command=lambda: self.app.show_main_menu(self.app.current_user, self.app.current_role)).grid(row=5, column=0, columnspan=4, pady=5)
             
             # Generar reporte inicial (todos los datos)
             self.generar_reporte()
@@ -204,7 +218,7 @@ class ReportesScreen:
             fecha_fin = self.fecha_fin.get_date().strftime("%Y-%m-%d")
             conn = sqlite3.connect(self.app.db_path)
             
-            # Datos para exportar
+            # Datos para exportar: Ventas
             df_ventas = pd.read_sql_query("""
                 SELECT v.id, v.fecha, c.nombre as cliente, u.usuario, v.total, v.metodo_pago
                 FROM ventas v
@@ -213,6 +227,7 @@ class ReportesScreen:
                 WHERE v.fecha BETWEEN ? AND ?
             """, conn, params=(fecha_inicio, fecha_fin + " 23:59:59"))
             
+            # Datos para exportar: Detalles de venta
             df_detalles = pd.read_sql_query("""
                 SELECT v.id, p.nombre as producto, dv.cantidad, dv.precio_unitario, dv.total
                 FROM detalles_venta dv
@@ -221,16 +236,49 @@ class ReportesScreen:
                 WHERE v.fecha BETWEEN ? AND ?
             """, conn, params=(fecha_inicio, fecha_fin + " 23:59:59"))
             
-            os.makedirs("exportaciones/reportes", exist_ok=True)
+            # Resumen: Total de ventas
+            c = conn.cursor()
+            c.execute("""
+                SELECT SUM(total)
+                FROM ventas
+                WHERE fecha BETWEEN ? AND ?
+            """, (fecha_inicio, fecha_fin + " 23:59:59"))
+            total_ventas = c.fetchone()[0] or 0
+            df_resumen = pd.DataFrame({
+                "Descripción": ["Total de Ventas"],
+                "Valor": [f"RD${total_ventas:.2f}"]
+            })
+            
+            os.makedirs(self.resource_path("exportaciones/reportes"), exist_ok=True)
             fecha_actual = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"exportaciones/reportes/reporte_{fecha_actual}.xlsx"
+            archivo = os.path.join(self.resource_path("exportaciones/reportes"), f"reporte_{fecha_actual}.xlsx")
             
             with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
                 df_ventas.to_excel(writer, sheet_name="Ventas", index=False)
                 df_detalles.to_excel(writer, sheet_name="Detalles_Venta", index=False)
+                df_resumen.to_excel(writer, sheet_name="Resumen", index=False)
             
             conn.close()
+            self.last_exported_file = archivo  # Guardar la ruta del archivo exportado
+            self.print_button.config(state="normal")  # Habilitar el botón de impresión
             messagebox.showinfo("Éxito", f"Reporte exportado a {archivo}")
+            print(f"Reporte exportado a {archivo}")
         except Exception as e:
             messagebox.showerror("Error", f"Error al exportar reporte: {e}")
             print(f"Error exportando reporte: {e}")
+            self.last_exported_file = None
+            self.print_button.config(state="disabled")  # Deshabilitar el botón si falla la exportación
+
+    def imprimir_reporte(self):
+        print("Imprimiendo reporte")
+        try:
+            if not self.last_exported_file or not os.path.exists(self.last_exported_file):
+                messagebox.showerror("Error", "Primero debe exportar un reporte a Excel")
+                print("No se encontró archivo para imprimir")
+                return
+            win32api.ShellExecute(0, "print", self.last_exported_file, None, ".", 0)
+            messagebox.showinfo("Éxito", f"Reporte {self.last_exported_file} enviado a la cola de impresión")
+            print(f"Reporte {self.last_exported_file} enviado a la cola de impresión")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al imprimir reporte: {e}. Asegúrese de que una impresora esté configurada y el archivo exista.")
+            print(f"Error imprimiendo reporte: {e}")

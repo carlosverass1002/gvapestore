@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import traceback
 import sqlite3
 import os
@@ -29,8 +29,8 @@ class GvapeStoreApp:
             self.current_role = None
             print("Verificando dependencias")
             self.check_dependencies()
-            print("Inicializando base de datos")
-            self.initialize_database()
+            print("Verificando base de datos")
+            self.verify_database()
             print("Intentando mostrar pantalla de login")
             self.show_login()
         except Exception as e:
@@ -46,22 +46,54 @@ class GvapeStoreApp:
             import pandas
             import openpyxl
             import tkcalendar
-            import win32print
-            import win32ui
             print("Todas las dependencias instaladas")
         except ImportError as e:
             print(f"Falta dependencia: {e}")
-            messagebox.showerror("Error", f"Falta una dependencia: {e}. Ejecute 'pip install tkinter reportlab pandas openpyxl tkcalendar pywin32'")
+            messagebox.showerror("Error", f"Falta una dependencia: {e}. Ejecute 'pip install tkinter reportlab pandas openpyxl tkcalendar'")
             exit(1)
 
-    def initialize_database(self):
-        print("Creando/verificando base de datos")
+    def verify_database(self):
+        print("Verificando existencia de la base de datos")
         try:
-            os.makedirs("base_datos", exist_ok=True)
+            # Verificar si el archivo de la base de datos existe
+            if not os.path.exists(self.db_path):
+                response = messagebox.askyesno(
+                    "Base de datos no encontrada",
+                    f"No se encontró la base de datos en {self.db_path}. ¿Desea seleccionar una base de datos existente?",
+                    default="yes"
+                )
+                if response:  # Sí: Seleccionar una base de datos existente
+                    self.db_path = filedialog.askopenfilename(
+                        title="Seleccionar base de datos",
+                        filetypes=[("Archivos SQLite", "*.db")]
+                    )
+                    if not self.db_path:
+                        messagebox.showinfo("Información", "No se seleccionó ninguna base de datos. Se creará una nueva.")
+                        self.db_path = "base_datos/gvape.db"
+                        os.makedirs("base_datos", exist_ok=True)
+                        self.initialize_database()
+                    else:
+                        print(f"Base de datos seleccionada: {self.db_path}")
+                        self.check_database_structure()
+                else:  # No: Crear una nueva base de datos
+                    os.makedirs("base_datos", exist_ok=True)
+                    self.initialize_database()
+            else:
+                print(f"Base de datos encontrada en {self.db_path}")
+                self.check_database_structure()
+        except Exception as e:
+            print(f"Error verificando base de datos: {e}")
+            traceback.print_exc()
+            messagebox.showerror("Error", f"Error verificando base de datos: {e}")
+            exit(1)
+
+    def check_database_structure(self):
+        print("Verificando estructura de la base de datos")
+        try:
             conn = sqlite3.connect(self.db_path)
             c = conn.cursor()
-            
-            # Crear tabla usuarios
+
+            # Verificar y crear tabla usuarios si no existe
             c.execute("""
                 CREATE TABLE IF NOT EXISTS usuarios (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,12 +102,15 @@ class GvapeStoreApp:
                     rol TEXT
                 )
             """)
-            c.execute("INSERT OR IGNORE INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
-                      ("admin", "admin123", "Admin"))
-            c.execute("INSERT OR IGNORE INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
-                      ("cajero", "cajero123", "Cajero"))
-            
-            # Crear tabla clientes
+            # Insertar usuarios iniciales solo si la tabla está vacía
+            c.execute("SELECT COUNT(*) FROM usuarios")
+            if c.fetchone()[0] == 0:
+                c.execute("INSERT INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
+                          ("admin", "admin123", "Admin"))
+                c.execute("INSERT INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
+                          ("cajero", "cajero123", "Cajero"))
+
+            # Verificar y crear tabla clientes si no existe
             c.execute("""
                 CREATE TABLE IF NOT EXISTS clientes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,8 +119,8 @@ class GvapeStoreApp:
                     telefono TEXT
                 )
             """)
-            
-            # Crear tabla productos (sin eliminar)
+
+            # Verificar y crear tabla productos si no existe
             c.execute("""
                 CREATE TABLE IF NOT EXISTS productos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,21 +133,19 @@ class GvapeStoreApp:
             # Insertar productos iniciales solo si la tabla está vacía
             c.execute("SELECT COUNT(*) FROM productos")
             if c.fetchone()[0] == 0:
-                print("Tabla productos vacía, insertando datos iniciales")
-                c.execute("INSERT OR IGNORE INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
+                c.execute("INSERT INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
                           ("00001", "Liquido Fresa", 500.00, 5))
-                c.execute("INSERT OR IGNORE INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
+                c.execute("INSERT INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
                           ("00002", "Liquido Menta", 500.00, 5))
-                c.execute("INSERT OR IGNORE INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
+                c.execute("INSERT INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
                           ("00003", "Servicio Limpieza", 200.00, None))
-            
-            # Crear tabla ventas (sin eliminar)
+
+            # Verificar y crear tabla ventas si no existe
             c.execute("""
                 CREATE TABLE IF NOT EXISTS ventas (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     fecha TEXT,
                     cliente_id INTEGER,
-                    cliente_nombre TEXT,
                     usuario_id INTEGER,
                     total REAL,
                     metodo_pago TEXT,
@@ -120,8 +153,8 @@ class GvapeStoreApp:
                     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
                 )
             """)
-            
-            # Crear tabla detalles_venta
+
+            # Verificar y crear tabla detalles_venta si no existe
             c.execute("""
                 CREATE TABLE IF NOT EXISTS detalles_venta (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,15 +167,100 @@ class GvapeStoreApp:
                     FOREIGN KEY (producto_id) REFERENCES productos(id)
                 )
             """)
+            # Verificar si la columna 'total' existe en detalles_venta
             c.execute("PRAGMA table_info(detalles_venta)")
             columns = [col[1] for col in c.fetchall()]
             if "total" not in columns:
                 print("Añadiendo columna 'total' a detalles_venta")
                 c.execute("ALTER TABLE detalles_venta ADD COLUMN total REAL")
-            
+
             conn.commit()
             conn.close()
-            print("Base de datos inicializada correctamente")
+            print("Estructura de base de datos verificada y completada")
+        except sqlite3.Error as e:
+            print(f"Error verificando estructura de base de datos: {e}")
+            traceback.print_exc()
+            messagebox.showerror("Error", f"Error verificando estructura de base de datos: {e}")
+            exit(1)
+
+    def initialize_database(self):
+        print("Creando nueva base de datos")
+        try:
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+
+            # Crear tabla usuarios
+            c.execute("""
+                CREATE TABLE usuarios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    usuario TEXT UNIQUE,
+                    contrasena TEXT,
+                    rol TEXT
+                )
+            """)
+            c.execute("INSERT INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
+                      ("admin", "admin123", "Admin"))
+            c.execute("INSERT INTO usuarios (usuario, contrasena, rol) VALUES (?, ?, ?)",
+                      ("cajero", "cajero123", "Cajero"))
+
+            # Crear tabla clientes
+            c.execute("""
+                CREATE TABLE clientes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT,
+                    cedula TEXT,
+                    telefono TEXT
+                )
+            """)
+
+            # Crear tabla productos
+            c.execute("""
+                CREATE TABLE productos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    codigo TEXT UNIQUE,
+                    nombre TEXT,
+                    precio REAL,
+                    stock INTEGER
+                )
+            """)
+            c.execute("INSERT INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
+                      ("00001", "Liquido Fresa", 500.00, 5))
+            c.execute("INSERT INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
+                      ("00002", "Liquido Menta", 500.00, 5))
+            c.execute("INSERT INTO productos (codigo, nombre, precio, stock) VALUES (?, ?, ?, ?)",
+                      ("00003", "Servicio Limpieza", 200.00, None))
+
+            # Crear tabla ventas
+            c.execute("""
+                CREATE TABLE ventas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fecha TEXT,
+                    cliente_id INTEGER,
+                    usuario_id INTEGER,
+                    total REAL,
+                    metodo_pago TEXT,
+                    FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                )
+            """)
+
+            # Crear tabla detalles_venta
+            c.execute("""
+                CREATE TABLE detalles_venta (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    venta_id INTEGER,
+                    producto_id INTEGER,
+                    cantidad INTEGER,
+                    precio_unitario REAL,
+                    total REAL,
+                    FOREIGN KEY (venta_id) REFERENCES ventas(id),
+                    FOREIGN KEY (producto_id) REFERENCES productos(id)
+                )
+            """)
+
+            conn.commit()
+            conn.close()
+            print("Base de datos creada e inicializada correctamente")
         except sqlite3.Error as e:
             print(f"Error inicializando base de datos: {e}")
             traceback.print_exc()
@@ -186,22 +304,24 @@ class GvapeStoreApp:
             buttons = [
                 ("Vender", lambda: self.show_screen(VentasScreen)),
                 ("Clientes", lambda: self.show_screen(ClientesScreen)),
-                ("Productos", lambda: self.show_screen(ProductosScreen)),
                 ("Historial de Ventas", lambda: self.show_screen(lambda root, app: ReportesScreen(root, app, "historial"))),
                 ("Reportes", lambda: self.show_screen(lambda root, app: ReportesScreen(root, app, "reportes"))),
+                ("Productos", lambda: self.show_screen(ProductosScreen)),
                 ("Configuración", lambda: self.show_screen(ConfiguracionScreen)),
                 ("Cerrar Sesión", self.show_login)
             ]
             
+            # Filtrar botones para cajeros: solo Vender, Clientes, Historial de Ventas, Reportes y Cerrar Sesión
             if self.current_role != "Admin":
-                buttons = [btn for btn in buttons if btn[0] != "Configuración"]
+                buttons = [btn for btn in buttons if btn[0] in ["Vender", "Clientes", "Historial de Ventas", "Reportes", "Cerrar Sesión"]]
             
+            # Organizar botones en una sola fila para cajeros, dos filas para admins
             for i, (text, command) in enumerate(buttons):
                 try:
-                    if i < 4:
-                        tk.Button(button_frame, text=text, command=command, width=15, height=2).grid(row=0, column=i, padx=5, pady=5)
-                    else:
+                    if self.current_role == "Admin" and i >= 4:
                         tk.Button(button_frame, text=text, command=command, width=15, height=2).grid(row=1, column=i-4, padx=5, pady=5)
+                    else:
+                        tk.Button(button_frame, text=text, command=command, width=15, height=2).grid(row=0, column=i, padx=5, pady=5)
                 except Exception as e:
                     print(f"Error creando botón {text}: {e}")
                     traceback.print_exc()
